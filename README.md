@@ -2,6 +2,11 @@
 
 A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. This application offers a seamless multilingual experience, allowing users to interact through voice or text in multiple languages.
 
+
+##Flowchart
+
+![Untitled diagram-2024-09-04-173138](https://github.com/user-attachments/assets/ba6421b6-7d6a-402c-8261-21f88b9af580)
+
 ## Features
 
 - **Dual Input Methods**: Choose between voice and text input for maximum flexibility.
