@@ -1,0 +1,6 @@
+   streamlit
+   gTTS
+   SpeechRecognition
+   groq
+   numpy
+   pydub
