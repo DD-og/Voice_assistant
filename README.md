@@ -1,11 +1,12 @@
-# Multilingual Voice Assistant Web App
+# Dev's Voice Assistant 🚀
 
-A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. This application offers a seamless multilingual experience, allowing users to interact through voice or text in multiple languages.
+A sophisticated multilingual voice assistant powered by Llama 3.1 70B, built with Streamlit. This application offers a seamless multilingual experience, allowing users to interact through voice or text in multiple languages. Dev's Voice Assistant combines cutting-edge AI technology with a user-friendly interface to provide intelligent responses and natural language processing capabilities.
 
 
 ##Flowchart
 
 ![mermaid-diagram-2024-09-07-103842](https://github.com/user-attachments/assets/0e62735c-0808-4a33-b765-23d83cf198ab)
+
 
 
 ## Features
@@ -15,8 +16,10 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 - **Speech-to-Text Conversion**: Accurately transcribes spoken words into text.
 - **Text-to-Speech Synthesis**: Converts text responses into natural-sounding speech.
 - **Language Translation**: Seamlessly translates between different languages.
-- **AI-Powered Responses**: Utilizes Llama 3.1 8B model for intelligent and context-aware replies.
+- **AI-Powered Responses**: Utilizes Llama 3.1 70B model via Groq API for intelligent and context-aware replies.
 - **Adjustable Speech Speed**: Customize the playback speed of audio responses.
+- **Conversation Management**: Save, load, and clear conversation history.
+- **Export Functionality**: Export conversations in TXT and PDF formats.
 - **User-Friendly Interface**: Built with Streamlit for an intuitive and responsive web experience.
 
 ## Supported Languages
@@ -30,12 +33,13 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 - Hindi
 - Gujarati
 
+
 ## Installation
 
 1. Clone the repository:
    ```
-   git clone https://github.com/DD-og/Voice_assistant.git
-   cd Voice_assistant
+   git clone https://github.com/yourusername/devs-voice-assistant.git
+   cd devs-voice-assistant
    ```
 
 2. Create and activate a virtual environment:
@@ -57,7 +61,7 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 
 1. Run the Streamlit app:
    ```
-   streamlit run main.py
+   streamlit run final_voiceassistant.py
    ```
 
 2. Open the provided URL in your web browser.
@@ -70,7 +74,7 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 
 6. For text input, type your command and click "Send".
 
-7. The assistant will process your input, generate a response, and provide it in your chosen output format (voice or text).
+7. The assistant will process your input, generate a response, and provide it in your chosen output format (voice and text).
 
 8. Adjust the speech speed slider to customize the playback speed of voice responses.
 
@@ -81,5 +85,4 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
+Contributions to improve Dev's Voice Assistant are welcome. Please feel free to submit a Pull Request.
