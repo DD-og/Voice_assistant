@@ -5,7 +5,8 @@ A sophisticated voice assistant powered by Llama 3.1 8B, built with Streamlit. T
 
 ##Flowchart
 
-![Untitled diagram-2024-09-04-173138](https://github.com/user-attachments/assets/ba6421b6-7d6a-402c-8261-21f88b9af580)
+![mermaid-diagram-2024-09-07-103842](https://github.com/user-attachments/assets/0e62735c-0808-4a33-b765-23d83cf198ab)
+
 
 ## Features
 
