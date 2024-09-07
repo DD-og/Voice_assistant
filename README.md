@@ -7,6 +7,9 @@ A sophisticated multilingual voice assistant powered by Llama 3.1 70B, built wit
 
 ![mermaid-diagram-2024-09-07-103842](https://github.com/user-attachments/assets/0e62735c-0808-4a33-b765-23d83cf198ab)
 
+## Here is how the website would look
+
+![image](https://github.com/user-attachments/assets/ce977df2-9307-4ef3-a73b-9ff2b9cbc0d3)
 
 
 ## Features
