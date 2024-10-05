@@ -1,3 +1,5 @@
+setuptools
+wheel
 streamlit==1.27.0
 gtts==2.3.2
 SpeechRecognition==3.10.0
