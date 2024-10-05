@@ -13,6 +13,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT
+from streamlit_webrtc import webrtc_streamer
+import av
+import numpy as np
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -167,17 +170,25 @@ def main():
     input_method = st.radio("Choose input method", ["Voice", "Text"])
 
     if input_method == "Voice":
-        audio_file = st.file_uploader("Upload an audio file", type=['wav', 'mp3'])
-        if audio_file is not None:
-            st.audio(audio_file, format='audio/wav')
-            if st.button("Transcribe"):
-                command = transcribe_audio(audio_file)
-                st.write(f"You said: {command}")
-                
-                if command and command != "Sorry, I couldn't understand the audio.":
-                    response, audio_fp = process_and_respond(command, input_lang, output_lang, languages)
-                    st.write("Assistant:", response)
-                    play_audio(audio_fp)
+        # Use webrtc_streamer for real-time audio
+        def audio_callback(frame):
+            audio_data = frame.to_ndarray().flatten().astype(np.int16)
+            recognizer = sr.Recognizer()
+            audio = sr.AudioData(audio_data.tobytes(), sample_rate=16000, sample_width=2)
+            try:
+                text = recognizer.recognize_google(audio)
+                st.write(f"You said: {text}")
+                response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                st.write("Assistant:", response)
+                play_audio(audio_fp)
+            except sr.UnknownValueError:
+                pass
+            except sr.RequestError:
+                st.error("Could not request results from the speech recognition service.")
+            return av.AudioFrame.from_ndarray(audio_data, layout='mono')
+
+        webrtc_streamer(key="voice_assistant", audio_processor_factory=audio_callback)
+
     else:
         command = st.text_input("Type your command")
         if st.button("Send"):
