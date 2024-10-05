@@ -17,6 +17,8 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import numpy as np
 import queue
+import pyaudio
+import wave
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -171,45 +173,49 @@ def main():
     input_method = st.radio("Choose input method", ["Voice", "Text"])
 
     if input_method == "Voice":
-        # Create a queue to store audio chunks
-        audio_queue = queue.Queue()
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RATE = 44100
+        CHUNK = 1024
+        RECORD_SECONDS = 5
+        WAVE_OUTPUT_FILENAME = "input.wav"
 
-        def audio_callback(frame):
-            audio_data = frame.to_ndarray().flatten().astype(np.int16)
-            audio_queue.put(audio_data)
-            return av.AudioFrame.from_ndarray(audio_data, layout='mono')
+        audio = pyaudio.PyAudio()
 
-        webrtc_ctx = webrtc_streamer(
-            key="voice_assistant",
-            mode=WebRtcMode.SENDONLY,
-            audio_receiver_size=1024,
-            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-            media_stream_constraints={"video": False, "audio": True},
-        )
+        if st.button("Start Recording"):
+            st.write("Recording...")
+            
+            stream = audio.open(format=FORMAT, channels=CHANNELS,
+                                rate=RATE, input=True,
+                                frames_per_buffer=CHUNK)
 
-        if webrtc_ctx.audio_receiver:
-            if st.button("Transcribe and Respond"):
-                # Collect audio data from the queue
-                audio_data = []
-                while not audio_queue.empty():
-                    audio_data.extend(audio_queue.get())
+            frames = []
 
-                # Convert audio data to AudioData object
-                audio = sr.AudioData(bytes(audio_data), sample_rate=16000, sample_width=2)
+            for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+                data = stream.read(CHUNK)
+                frames.append(data)
 
-                try:
-                    # Transcribe audio
-                    text = sr.Recognizer().recognize_google(audio)
-                    st.write(f"You said: {text}")
+            st.write("Recording finished")
 
-                    # Process and respond
-                    response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-                    st.write("Assistant:", response)
-                    play_audio(audio_fp)
-                except sr.UnknownValueError:
-                    st.error("Sorry, I couldn't understand the audio.")
-                except sr.RequestError:
-                    st.error("Could not request results from the speech recognition service.")
+            stream.stop_stream()
+            stream.close()
+            audio.terminate()
+
+            wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(audio.get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(frames))
+            wf.close()
+
+            # Transcribe the recorded audio
+            text = transcribe_audio(WAVE_OUTPUT_FILENAME)
+            st.write(f"You said: {text}")
+
+            # Process and respond
+            response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+            st.write("Assistant:", response)
+            play_audio(audio_fp)
 
     else:
         command = st.text_input("Type your command")
