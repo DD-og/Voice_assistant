@@ -8,3 +8,5 @@ groq
 reportlab
 numpy
 streamlit-webrtc
+av
+pydub
