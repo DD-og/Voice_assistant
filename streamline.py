@@ -13,12 +13,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
-import av
-import numpy as np
-import queue
 import pyaudio
 import wave
+import numpy as np
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -182,40 +179,66 @@ def main():
 
         audio = pyaudio.PyAudio()
 
-        if st.button("Start Recording"):
-            st.write("Recording...")
-            
+        # Initialize button state in session state
+        if 'button_disabled' not in st.session_state:
+            st.session_state.button_disabled = False
+
+        st.write(" ")
+        # Start and stop recording buttons in a single line
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            start_button = st.button('Start Recording', disabled=st.session_state.button_disabled)
+        with col2:
+            stop_button = st.button('Stop Recording', disabled=not st.session_state.button_disabled)
+
+        if 'is_recording' not in st.session_state:
+            st.session_state.is_recording = False
+
+        if start_button:
+            st.session_state.is_recording = True
+            st.session_state.button_disabled = True
+            # Open a stream to record the audio
             stream = audio.open(format=FORMAT, channels=CHANNELS,
                                 rate=RATE, input=True,
                                 frames_per_buffer=CHUNK)
+            st.session_state.stream = stream
+            st.session_state.frames = []
+            st.success("Recording started")
 
-            frames = []
+        if stop_button:
+            st.session_state.is_recording = False
+            st.session_state.button_disabled = False
+            if 'stream' in st.session_state:
+                # Stop recording
+                st.session_state.stream.stop_stream()
+                st.session_state.stream.close()
+                
+                # Terminate the pyaudio object
+                audio.terminate()
 
-            for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-                data = stream.read(CHUNK)
-                frames.append(data)
+                # Save the audio frames as a wave file
+                with wave.open(WAVE_OUTPUT_FILENAME, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(audio.get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(b''.join(st.session_state.frames))
+                
+                st.success(f"Recording stopped and Audio saved.")
 
-            st.write("Recording finished")
+                # Transcribe the audio
+                text = transcribe_audio(WAVE_OUTPUT_FILENAME)
+                st.write(f"You said: {text}")
 
-            stream.stop_stream()
-            stream.close()
-            audio.terminate()
+                # Process and respond
+                response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                st.write("Assistant:", response)
+                play_audio(audio_fp)
 
-            wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(audio.get_sample_size(FORMAT))
-            wf.setframerate(RATE)
-            wf.writeframes(b''.join(frames))
-            wf.close()
-
-            # Transcribe the recorded audio
-            text = transcribe_audio(WAVE_OUTPUT_FILENAME)
-            st.write(f"You said: {text}")
-
-            # Process and respond
-            response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-            st.write("Assistant:", response)
-            play_audio(audio_fp)
+        # Recording logic
+        if st.session_state.is_recording:
+            if 'stream' in st.session_state:
+                data = st.session_state.stream.read(CHUNK)
+                st.session_state.frames.append(data)
 
     else:
         command = st.text_input("Type your command")
