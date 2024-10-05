@@ -1,7 +1,6 @@
 import streamlit as st
 from gtts import gTTS
 import io
-from pydub import AudioSegment
 import tempfile
 import os
 import speech_recognition as sr
@@ -14,7 +13,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
-import av
 import numpy as np
 import queue
 
@@ -187,29 +185,21 @@ def main():
             try:
                 audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
                 if audio_frames:
-                    sound_chunk = AudioSegment.empty()
-                    for audio_frame in audio_frames:
-                        sound = AudioSegment(
-                            data=audio_frame.to_ndarray().tobytes(),
-                            sample_width=audio_frame.format.bytes,
-                            frame_rate=audio_frame.sample_rate,
-                            channels=len(audio_frame.layout.channels),
-                        )
-                        sound_chunk += sound
+                    audio_data = b''.join(frame.to_ndarray().tobytes() for frame in audio_frames)
+                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
+                        temp_audio_file.write(audio_data)
+                        temp_audio_file.flush()
+                        
+                        text = transcribe_audio(temp_audio_file.name)
+                        st.write(f"You said: {text}")
 
-                    if len(sound_chunk) > 0:
-                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
-                            sound_chunk.export(temp_audio_file.name, format="wav")
-                            text = transcribe_audio(temp_audio_file.name)
-                            st.write(f"You said: {text}")
+                        # Process and respond
+                        response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                        st.write("Assistant:", response)
+                        play_audio(audio_fp)
 
-                            # Process and respond
-                            response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-                            st.write("Assistant:", response)
-                            play_audio(audio_fp)
-
-                        # Clean up the temporary file
-                        os.unlink(temp_audio_file.name)
+                    # Clean up the temporary file
+                    os.unlink(temp_audio_file.name)
                 else:
                     st.warning("No audio detected. Please try speaking again.")
             except Exception as e:
