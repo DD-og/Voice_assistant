@@ -13,9 +13,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT
-from streamlit_webrtc import webrtc_streamer
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import numpy as np
+import queue
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -170,24 +171,45 @@ def main():
     input_method = st.radio("Choose input method", ["Voice", "Text"])
 
     if input_method == "Voice":
-        # Use webrtc_streamer for real-time audio
+        # Create a queue to store audio chunks
+        audio_queue = queue.Queue()
+
         def audio_callback(frame):
             audio_data = frame.to_ndarray().flatten().astype(np.int16)
-            recognizer = sr.Recognizer()
-            audio = sr.AudioData(audio_data.tobytes(), sample_rate=16000, sample_width=2)
-            try:
-                text = recognizer.recognize_google(audio)
-                st.write(f"You said: {text}")
-                response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-                st.write("Assistant:", response)
-                play_audio(audio_fp)
-            except sr.UnknownValueError:
-                pass
-            except sr.RequestError:
-                st.error("Could not request results from the speech recognition service.")
+            audio_queue.put(audio_data)
             return av.AudioFrame.from_ndarray(audio_data, layout='mono')
 
-        webrtc_streamer(key="voice_assistant", audio_processor_factory=audio_callback)
+        webrtc_ctx = webrtc_streamer(
+            key="voice_assistant",
+            mode=WebRtcMode.SENDONLY,
+            audio_receiver_size=1024,
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            media_stream_constraints={"video": False, "audio": True},
+        )
+
+        if webrtc_ctx.audio_receiver:
+            if st.button("Transcribe and Respond"):
+                # Collect audio data from the queue
+                audio_data = []
+                while not audio_queue.empty():
+                    audio_data.extend(audio_queue.get())
+
+                # Convert audio data to AudioData object
+                audio = sr.AudioData(bytes(audio_data), sample_rate=16000, sample_width=2)
+
+                try:
+                    # Transcribe audio
+                    text = sr.Recognizer().recognize_google(audio)
+                    st.write(f"You said: {text}")
+
+                    # Process and respond
+                    response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                    st.write("Assistant:", response)
+                    play_audio(audio_fp)
+                except sr.UnknownValueError:
+                    st.error("Sorry, I couldn't understand the audio.")
+                except sr.RequestError:
+                    st.error("Could not request results from the speech recognition service.")
 
     else:
         command = st.text_input("Type your command")
