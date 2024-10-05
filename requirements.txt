@@ -1,14 +1,11 @@
 streamlit==1.31.1
 gTTS==2.5.1
-sounddevice==0.4.6
 numpy==1.26.4
 pydub==0.25.1
 SpeechRecognition==3.10.1
 deep-translator==1.11.4
 groq==0.4.2
-pygame==2.5.2
 reportlab==4.1.0
 av
-aiortc
-PyAudio==0.2.14
 streamlit-webrtc
+numpy
