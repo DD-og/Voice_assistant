@@ -13,9 +13,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT
-import pyaudio
-import wave
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+import av
 import numpy as np
+import queue
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -24,6 +25,10 @@ client = groq.Groq(api_key=GROQ_API_KEY)
 
 if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = []
+
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
 
 @st.cache_data
 def text_to_speech(text, lang='en'):
@@ -170,75 +175,42 @@ def main():
     input_method = st.radio("Choose input method", ["Voice", "Text"])
 
     if input_method == "Voice":
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 44100
-        CHUNK = 1024
-        RECORD_SECONDS = 5
-        WAVE_OUTPUT_FILENAME = "input.wav"
+        webrtc_ctx = webrtc_streamer(
+            key="speech-to-text",
+            mode=WebRtcMode.SENDONLY,
+            rtc_configuration=RTC_CONFIGURATION,
+            audio_receiver_size=1024,
+            media_stream_constraints={"video": False, "audio": True},
+        )
 
-        audio = pyaudio.PyAudio()
+        if webrtc_ctx.audio_receiver:
+            sound_chunk = AudioSegment.empty()
+            try:
+                audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
+                for audio_frame in audio_frames:
+                    sound = AudioSegment(
+                        data=audio_frame.to_ndarray().tobytes(),
+                        sample_width=audio_frame.format.bytes,
+                        frame_rate=audio_frame.sample_rate,
+                        channels=len(audio_frame.layout.channels),
+                    )
+                    sound_chunk += sound
 
-        # Initialize button state in session state
-        if 'button_disabled' not in st.session_state:
-            st.session_state.button_disabled = False
+                if len(sound_chunk) > 0:
+                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
+                        sound_chunk.export(temp_audio_file.name, format="wav")
+                        text = transcribe_audio(temp_audio_file.name)
+                        st.write(f"You said: {text}")
 
-        st.write(" ")
-        # Start and stop recording buttons in a single line
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            start_button = st.button('Start Recording', disabled=st.session_state.button_disabled)
-        with col2:
-            stop_button = st.button('Stop Recording', disabled=not st.session_state.button_disabled)
+                        # Process and respond
+                        response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                        st.write("Assistant:", response)
+                        play_audio(audio_fp)
 
-        if 'is_recording' not in st.session_state:
-            st.session_state.is_recording = False
-
-        if start_button:
-            st.session_state.is_recording = True
-            st.session_state.button_disabled = True
-            # Open a stream to record the audio
-            stream = audio.open(format=FORMAT, channels=CHANNELS,
-                                rate=RATE, input=True,
-                                frames_per_buffer=CHUNK)
-            st.session_state.stream = stream
-            st.session_state.frames = []
-            st.success("Recording started")
-
-        if stop_button:
-            st.session_state.is_recording = False
-            st.session_state.button_disabled = False
-            if 'stream' in st.session_state:
-                # Stop recording
-                st.session_state.stream.stop_stream()
-                st.session_state.stream.close()
-                
-                # Terminate the pyaudio object
-                audio.terminate()
-
-                # Save the audio frames as a wave file
-                with wave.open(WAVE_OUTPUT_FILENAME, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(audio.get_sample_size(FORMAT))
-                    wf.setframerate(RATE)
-                    wf.writeframes(b''.join(st.session_state.frames))
-                
-                st.success(f"Recording stopped and Audio saved.")
-
-                # Transcribe the audio
-                text = transcribe_audio(WAVE_OUTPUT_FILENAME)
-                st.write(f"You said: {text}")
-
-                # Process and respond
-                response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-                st.write("Assistant:", response)
-                play_audio(audio_fp)
-
-        # Recording logic
-        if st.session_state.is_recording:
-            if 'stream' in st.session_state:
-                data = st.session_state.stream.read(CHUNK)
-                st.session_state.frames.append(data)
+                    # Clean up the temporary file
+                    os.unlink(temp_audio_file.name)
+            except queue.Empty:
+                pass
 
     else:
         command = st.text_input("Type your command")
