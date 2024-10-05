@@ -15,6 +15,8 @@ from reportlab.lib.enums import TA_RIGHT
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import numpy as np
 import queue
+import av
+import pydub
 
 # Use Streamlit secrets for API key
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -182,10 +184,30 @@ def main():
         )
 
         if webrtc_ctx.audio_receiver:
-            try:
-                audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
-                if audio_frames:
-                    audio_data = b''.join(frame.to_ndarray().tobytes() for frame in audio_frames)
+            sound_chunk = pydub.AudioSegment.empty()
+            audio_queue = queue.Queue()
+
+            def audio_frame_callback(frame: av.AudioFrame):
+                sound = pydub.AudioSegment(
+                    data=frame.to_ndarray().tobytes(),
+                    sample_width=frame.format.bytes,
+                    frame_rate=frame.sample_rate,
+                    channels=len(frame.layout.channels),
+                )
+                sound_chunk.append(sound)
+                audio_queue.put(sound)
+
+            webrtc_ctx.audio_receiver.set_audio_frame_callback(audio_frame_callback)
+
+            if st.button("Start Recording"):
+                with st.spinner("Recording..."):
+                    audio_data = b""
+                    while len(audio_data) < 64000:  # Adjust this value as needed
+                        try:
+                            audio_data += audio_queue.get(timeout=1).raw_data
+                        except queue.Empty:
+                            break
+
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
                         temp_audio_file.write(audio_data)
                         temp_audio_file.flush()
@@ -200,10 +222,6 @@ def main():
 
                     # Clean up the temporary file
                     os.unlink(temp_audio_file.name)
-                else:
-                    st.warning("No audio detected. Please try speaking again.")
-            except Exception as e:
-                st.error(f"An error occurred while processing audio: {str(e)}")
         else:
             st.warning("WebRTC audio stream not available. Please check your microphone settings and try again.")
 
