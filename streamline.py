@@ -184,33 +184,38 @@ def main():
         )
 
         if webrtc_ctx.audio_receiver:
-            sound_chunk = AudioSegment.empty()
             try:
                 audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
-                for audio_frame in audio_frames:
-                    sound = AudioSegment(
-                        data=audio_frame.to_ndarray().tobytes(),
-                        sample_width=audio_frame.format.bytes,
-                        frame_rate=audio_frame.sample_rate,
-                        channels=len(audio_frame.layout.channels),
-                    )
-                    sound_chunk += sound
+                if audio_frames:
+                    sound_chunk = AudioSegment.empty()
+                    for audio_frame in audio_frames:
+                        sound = AudioSegment(
+                            data=audio_frame.to_ndarray().tobytes(),
+                            sample_width=audio_frame.format.bytes,
+                            frame_rate=audio_frame.sample_rate,
+                            channels=len(audio_frame.layout.channels),
+                        )
+                        sound_chunk += sound
 
-                if len(sound_chunk) > 0:
-                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
-                        sound_chunk.export(temp_audio_file.name, format="wav")
-                        text = transcribe_audio(temp_audio_file.name)
-                        st.write(f"You said: {text}")
+                    if len(sound_chunk) > 0:
+                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
+                            sound_chunk.export(temp_audio_file.name, format="wav")
+                            text = transcribe_audio(temp_audio_file.name)
+                            st.write(f"You said: {text}")
 
-                        # Process and respond
-                        response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
-                        st.write("Assistant:", response)
-                        play_audio(audio_fp)
+                            # Process and respond
+                            response, audio_fp = process_and_respond(text, input_lang, output_lang, languages)
+                            st.write("Assistant:", response)
+                            play_audio(audio_fp)
 
-                    # Clean up the temporary file
-                    os.unlink(temp_audio_file.name)
-            except queue.Empty:
-                pass
+                        # Clean up the temporary file
+                        os.unlink(temp_audio_file.name)
+                else:
+                    st.warning("No audio detected. Please try speaking again.")
+            except Exception as e:
+                st.error(f"An error occurred while processing audio: {str(e)}")
+        else:
+            st.warning("WebRTC audio stream not available. Please check your microphone settings and try again.")
 
     else:
         command = st.text_input("Type your command")
